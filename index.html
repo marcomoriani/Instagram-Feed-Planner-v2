@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Feed Rebecca">
+  <meta name="format-detection" content="telephone=no">
+  <title>Rebecca • Anteprima feed</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/icon-180.png">
+  <link rel="stylesheet" href="./styles.css?v=5">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <header class="profile-header" aria-label="Intestazione profilo">
+      <button class="icon-button" aria-label="Indietro" data-action="noop">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg>
+      </button>
+      <h1 class="username">rebecca.bungau</h1>
+      <div class="header-actions">
+        <button class="icon-button" aria-label="Notifiche" data-action="noop">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+        </button>
+        <button id="plannerMenuButton" class="icon-button" aria-label="Apri strumenti anteprima">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.45"/><circle cx="12" cy="12" r="1.45"/><circle cx="19" cy="12" r="1.45"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="profile-overview" aria-label="Profilo Rebecca Bungau">
+        <div class="profile-main-row">
+          <div class="profile-picture-ring"><img class="profile-picture" src="./assets/profile.jpg" alt="Foto profilo di Rebecca Bungau"></div>
+          <div class="profile-details">
+            <div class="display-name">Rebecca Bungau</div>
+            <div class="stats" aria-label="Statistiche profilo">
+              <div><strong id="postCount">14</strong><span>post</span></div>
+              <div><strong>1682</strong><span>follower</span></div>
+              <div><strong>827</strong><span>seguiti</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bio">What’s meant to be, will be<br><span class="bio-link">@re.ginadicuori</span><br><strong class="translation-link">Vedi traduzione</strong></div>
+
+        <div class="followed-by">
+          <div class="avatar-stack" aria-hidden="true">
+            <img src="./assets/posts/04.jpg" alt="">
+            <img src="./assets/highlights/corfu.jpg" alt="">
+            <img src="./assets/highlights/heart.jpg" alt="">
+          </div>
+          <div>Account seguito da <strong>lucamoriani</strong>,<br><strong>joaquin.mtt</strong> e <strong>altri 58</strong></div>
+        </div>
+
+        <div class="profile-buttons" aria-hidden="true">
+          <button>Segui già <svg viewBox="0 0 16 16"><path d="m4 6 4 4 4-4"/></svg></button>
+          <button>Messaggio</button>
+          <button class="person-button"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M18 8v6M15 11h6"/></svg></button>
+        </div>
+      </section>
+
+      <section class="highlights" aria-label="Storie in evidenza">
+        <div class="highlight"><div><img src="./assets/highlights/dolomites.jpg" alt="Dolomites"></div><span>Dolomites</span></div>
+        <div class="highlight"><div><img src="./assets/highlights/rebecca.jpg" alt="Rebecca"></div><span>Rebecca</span></div>
+        <div class="highlight"><div><img src="./assets/highlights/corfu.jpg" alt="Corfù"></div><span>Corfù</span></div>
+        <div class="highlight"><div><img src="./assets/highlights/heart.jpg" alt="Cuore"></div><span>♡</span></div>
+        <div class="highlight"><div><img src="./assets/highlights/italy.jpg" alt="Italy"></div><span>Italy</span></div>
+      </section>
+
+      <nav class="profile-tabs" aria-label="Sezioni profilo">
+        <button class="active" aria-label="Post">
+          <svg viewBox="0 0 24 24"><g fill="currentColor"><rect x="3" y="3" width="5" height="5" rx=".8"/><rect x="9.5" y="3" width="5" height="5" rx=".8"/><rect x="16" y="3" width="5" height="5" rx=".8"/><rect x="3" y="9.5" width="5" height="5" rx=".8"/><rect x="9.5" y="9.5" width="5" height="5" rx=".8"/><rect x="16" y="9.5" width="5" height="5" rx=".8"/><rect x="3" y="16" width="5" height="5" rx=".8"/><rect x="9.5" y="16" width="5" height="5" rx=".8"/><rect x="16" y="16" width="5" height="5" rx=".8"/></g></svg>
+        </button>
+        <button aria-label="Repost"><svg viewBox="0 0 24 24"><path d="M7 7h10l-3-3M17 17H7l3 3M19 7v5M5 17v-5"/></svg></button>
+        <button aria-label="Post in cui sei taggato"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="3"/><path d="M7 18c1-3 3-4 5-4s4 1 5 4"/></svg></button>
+      </nav>
+
+      <section id="feedGrid" class="feed-grid" aria-label="Anteprima feed">
+        <!-- Scheletro iniziale: JavaScript sostituisce subito questi riquadri con i post salvati. -->
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+        <article class="feed-item feed-skeleton" aria-hidden="true"></article>
+      </section>
+      <div id="emptyState" class="empty-state" hidden>
+        <strong>Nessun post nell’anteprima</strong>
+        <span>Apri il menu in alto a destra e aggiungi una foto.</span>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="backdrop" class="backdrop" hidden></div>
+
+  <section id="plannerSheet" class="bottom-sheet" aria-modal="true" role="dialog" aria-label="Strumenti anteprima" hidden>
+    <div class="sheet-handle"></div>
+    <h2>Anteprima feed</h2>
+    <div class="version-badge">Versione 5 · iPhone/Safari</div>
+    <div id="storageStatus" class="storage-status">Controllo memoria…</div>
+    <button class="sheet-action primary" id="addPostButton">
+      <span class="sheet-icon">＋</span><span><strong>Aggiungi un post</strong><small>Scegli una o più foto</small></span>
+    </button>
+    <button class="sheet-action" id="editFeedButton">
+      <span class="sheet-icon">↕</span><span><strong>Riordina o elimina</strong><small>Tieni premuto un post e trascinalo</small></span>
+    </button>
+    <button class="sheet-action" id="exportButton">
+      <span class="sheet-icon">⇩</span><span><strong>Esporta backup</strong><small>Salva foto e ordine in un file</small></span>
+    </button>
+    <button class="sheet-action" id="importButton">
+      <span class="sheet-icon">⇧</span><span><strong>Importa backup</strong><small>Ripristina un file esportato</small></span>
+    </button>
+    <button class="sheet-action danger" id="resetButton">
+      <span class="sheet-icon">↺</span><span><strong>Ripristina feed iniziale</strong><small>Reimposta i 14 post dello screenshot</small></span>
+    </button>
+    <button class="sheet-cancel" data-close-sheet>Chiudi</button>
+  </section>
+
+  <section id="editorBar" class="editor-bar" hidden aria-label="Modalità riordino">
+    <span><strong>Modifica feed</strong><small>Tieni premuto e trascina</small></span>
+    <button id="finishEditButton">Fine</button>
+  </section>
+
+  <section id="createModal" class="full-modal" hidden aria-modal="true" role="dialog" aria-label="Crea nuovo post">
+    <header class="modal-header">
+      <button id="cancelCreateButton">Annulla</button>
+      <strong>Nuovo post</strong>
+      <button id="savePostButton" class="accent">Aggiungi</button>
+    </header>
+    <div class="crop-stage" id="cropStage">
+      <img id="cropImage" alt="Anteprima della foto selezionata">
+      <div class="crop-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      <div class="cover-label">ANTEPRIMA 3:4</div>
+    </div>
+    <div class="crop-controls">
+      <label for="zoomRange">Zoom</label>
+      <input id="zoomRange" type="range" min="1" max="3" step="0.01" value="1">
+    </div>
+    <div class="selection-row">
+      <div>
+        <strong id="selectedCount">1 foto selezionata</strong>
+        <small id="coverSummary">Copertina: foto 1</small>
+      </div>
+      <button id="chooseMoreButton" class="round-add" aria-label="Scegli altre foto">＋</button>
+    </div>
+    <div id="selectedThumbs" class="selected-thumbs"></div>
+    <div class="cover-actions">
+      <button id="setCoverButton" type="button">Usa la foto selezionata come copertina</button>
+    </div>
+    <p class="create-hint">La griglia mostra un ritaglio verticale 3:4, senza deformare la foto. Trascina o usa due dita per scegliere esattamente l’inquadratura.</p>
+  </section>
+
+  <section id="postViewer" class="full-modal post-viewer" hidden aria-modal="true" role="dialog" aria-label="Anteprima post">
+    <header class="modal-header viewer-header">
+      <button id="closeViewerButton" aria-label="Chiudi"><svg viewBox="0 0 24 24"><path d="m15 4-8 8 8 8"/></svg></button>
+      <strong>Post</strong>
+      <span></span>
+    </header>
+    <div class="viewer-user"><img src="./assets/profile.jpg" alt=""><strong>rebecca.bungau</strong></div>
+    <div id="viewerMedia" class="viewer-media"></div>
+    <div id="viewerDots" class="viewer-dots"></div>
+  </section>
+
+  <input id="photoInput" type="file" accept="image/*" multiple hidden>
+  <input id="backupInput" type="file" accept="application/json,.json" hidden>
+
+  <script src="./initial-posts.js?v=5" defer></script>
+  <script src="./app.js?v=5" defer></script>
+</body>
+</html>
