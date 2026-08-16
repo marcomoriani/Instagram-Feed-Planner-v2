@@ -475,36 +475,76 @@
 
   function bindLongPressDrag(item) {
     let timer = null;
+    let pointerId = null;
     let startX = 0;
     let startY = 0;
+    let lastX = 0;
+    let lastY = 0;
+    let pressing = false;
 
-    const clear = () => { if (timer) clearTimeout(timer); timer = null; };
+    const clearTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = null;
+    };
+
+    const releasePointer = event => {
+      clearTimer();
+      pressing = false;
+      if (pointerId !== null) {
+        try { item.releasePointerCapture?.(pointerId); } catch (_) {}
+      }
+      pointerId = null;
+      if (dragInfo && (!event || dragInfo.pointerId === event.pointerId)) finishGridDrag();
+    };
+
+    item.addEventListener('contextmenu', event => event.preventDefault());
 
     item.addEventListener('pointerdown', event => {
-      if (event.target.closest('.delete-post')) return;
-      startX = event.clientX;
-      startY = event.clientY;
-      item.setPointerCapture?.(event.pointerId);
-      timer = setTimeout(() => startGridDrag(item, event), 260);
-    });
+      if (event.target.closest('.delete-post') || event.isPrimary === false || dragInfo) return;
+      event.preventDefault();
+      pointerId = event.pointerId;
+      pressing = true;
+      startX = lastX = event.clientX;
+      startY = lastY = event.clientY;
+      try { item.setPointerCapture?.(event.pointerId); } catch (_) {}
+
+      timer = setTimeout(() => {
+        timer = null;
+        if (!pressing || pointerId !== event.pointerId || dragInfo) return;
+        startGridDrag(item, {
+          pointerId,
+          clientX: lastX,
+          clientY: lastY
+        });
+      }, 230);
+    }, { passive: false });
+
     item.addEventListener('pointermove', event => {
-      if (dragInfo) {
-        updateGridDrag(event);
+      if (pointerId !== event.pointerId && dragInfo?.pointerId !== event.pointerId) return;
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      if (dragInfo?.pointerId === event.pointerId) {
+        event.preventDefault();
+        updateGridDrag(event.clientX, event.clientY);
         return;
       }
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) clear();
-    });
-    item.addEventListener('pointerup', event => {
-      clear();
-      if (dragInfo) finishGridDrag(event);
-    });
-    item.addEventListener('pointercancel', event => {
-      clear();
-      if (dragInfo) finishGridDrag(event);
+
+      // Un piccolo movimento del dito durante la pressione è normale su iPhone.
+      // Annulliamo il long-press solo se il gesto parte chiaramente prima dell'attivazione.
+      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 24) {
+        clearTimer();
+      }
+    }, { passive: false });
+
+    item.addEventListener('pointerup', releasePointer);
+    item.addEventListener('pointercancel', releasePointer);
+    item.addEventListener('lostpointercapture', event => {
+      if (dragInfo?.pointerId === event.pointerId) finishGridDrag();
     });
   }
 
-  function startGridDrag(item, event) {
+  function startGridDrag(item, point) {
     const rect = item.getBoundingClientRect();
     const ghost = document.createElement('div');
     ghost.className = 'drag-ghost';
@@ -512,45 +552,132 @@
     ghost.style.height = `${rect.height}px`;
     ghost.innerHTML = `<img src="${$('img', item).src}" alt="">`;
     document.body.append(ghost);
+
     item.classList.add('drag-source');
+    item.setAttribute('aria-grabbed', 'true');
+    els.grid.classList.add('dragging');
+    document.body.classList.add('grid-dragging');
+
     dragInfo = {
       id: item.dataset.id,
+      pointerId: point.pointerId,
       source: item,
       ghost,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top
+      offsetX: Math.max(0, Math.min(rect.width, point.clientX - rect.left)),
+      offsetY: Math.max(0, Math.min(rect.height, point.clientY - rect.top)),
+      x: point.clientX,
+      y: point.clientY,
+      autoScrollFrame: null
     };
-    positionGhost(event.clientX, event.clientY);
+
+    setEditorDragState(true);
+    positionGhost(point.clientX, point.clientY);
+    startGridAutoScroll();
   }
 
-  function updateGridDrag(event) {
+  function updateGridDrag(x, y) {
     if (!dragInfo) return;
-    event.preventDefault();
-    positionGhost(event.clientX, event.clientY);
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest('.feed-item');
-    if (!target || target === dragInfo.source || !els.grid.contains(target)) return;
-    const fromIndex = posts.findIndex(p => p.id === dragInfo.id);
-    const toId = target.dataset.id;
-    const toIndex = posts.findIndex(p => p.id === toId);
+    dragInfo.x = x;
+    dragInfo.y = y;
+    positionGhost(x, y);
+    reorderGridAtPoint(x, y);
+  }
+
+  function reorderGridAtPoint(x, y) {
+    if (!dragInfo) return;
+
+    let target = document.elementFromPoint(x, y)?.closest('.feed-item');
+    if (!target || target === dragInfo.source || !els.grid.contains(target)) {
+      target = nearestGridItem(x, y);
+    }
+    if (!target || target === dragInfo.source) return;
+
+    const fromIndex = posts.findIndex(post => post.id === dragInfo.id);
+    const toIndex = posts.findIndex(post => post.id === target.dataset.id);
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+
     const [moved] = posts.splice(fromIndex, 1);
     posts.splice(toIndex, 0, moved);
+
+    // Sposta davvero il riquadro nella nuova posizione, non fa uno "swap" singolo.
+    // Continuando a tenere il dito premuto può attraversare tutte le righe del feed.
     els.grid.insertBefore(dragInfo.source, fromIndex < toIndex ? target.nextSibling : target);
   }
 
+  function nearestGridItem(x, y) {
+    const gridRect = els.grid.getBoundingClientRect();
+    if (x < gridRect.left - 24 || x > gridRect.right + 24 || y < gridRect.top - 80 || y > gridRect.bottom + 80) return null;
+
+    let best = null;
+    let bestDistance = Infinity;
+    $$('.feed-item', els.grid).forEach(item => {
+      if (item === dragInfo?.source) return;
+      const rect = item.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const distance = Math.hypot(x - cx, y - cy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = item;
+      }
+    });
+    return best;
+  }
+
   function positionGhost(x, y) {
+    if (!dragInfo) return;
     dragInfo.ghost.style.left = `${x - dragInfo.offsetX}px`;
     dragInfo.ghost.style.top = `${y - dragInfo.offsetY}px`;
-    const edge = 70;
-    if (y < edge) window.scrollBy({ top: -12, behavior: 'auto' });
-    if (y > window.innerHeight - edge) window.scrollBy({ top: 12, behavior: 'auto' });
+  }
+
+  function startGridAutoScroll() {
+    if (!dragInfo) return;
+
+    const tick = () => {
+      if (!dragInfo) return;
+
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const edge = Math.min(96, Math.max(68, viewportHeight * 0.14));
+      let delta = 0;
+
+      if (dragInfo.y < edge) {
+        delta = -Math.max(4, Math.round((edge - dragInfo.y) / edge * 16));
+      } else if (dragInfo.y > viewportHeight - edge) {
+        delta = Math.max(4, Math.round((dragInfo.y - (viewportHeight - edge)) / edge * 16));
+      }
+
+      if (delta) {
+        const before = window.scrollY;
+        window.scrollBy(0, delta);
+        if (window.scrollY !== before) reorderGridAtPoint(dragInfo.x, dragInfo.y);
+      }
+
+      dragInfo.autoScrollFrame = requestAnimationFrame(tick);
+    };
+
+    dragInfo.autoScrollFrame = requestAnimationFrame(tick);
+  }
+
+  function setEditorDragState(active) {
+    els.editorBar.classList.toggle('drag-active', active);
+    const hint = $('.editor-drag-hint', els.editorBar);
+    if (hint) hint.textContent = active
+      ? 'Sposta dove vuoi · rilascia per salvare'
+      : 'Tieni premuto · trascina ovunque · rilascia';
   }
 
   async function finishGridDrag() {
     if (!dragInfo) return;
-    dragInfo.source.classList.remove('drag-source');
-    dragInfo.ghost.remove();
+    const finished = dragInfo;
+    if (finished.autoScrollFrame) cancelAnimationFrame(finished.autoScrollFrame);
+    finished.source.classList.remove('drag-source');
+    finished.source.removeAttribute('aria-grabbed');
+    finished.ghost.remove();
+    els.grid.classList.remove('dragging');
+    document.body.classList.remove('grid-dragging');
     dragInfo = null;
+    setEditorDragState(false);
+
     await persistOrder();
     renderFeed();
     showToast('Nuovo ordine salvato');
