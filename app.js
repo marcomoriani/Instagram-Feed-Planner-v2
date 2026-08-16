@@ -56,6 +56,7 @@
   let cropByIndex = new Map();
   let pointerState = new Map();
   let dragInfo = null;
+  let gridPress = null;
   let toastTimer;
   let lastStorageRefresh = 0;
 
@@ -99,6 +100,17 @@
     els.cropStage.addEventListener('pointermove', onCropPointerMove);
     els.cropStage.addEventListener('pointerup', onCropPointerUp);
     els.cropStage.addEventListener('pointercancel', onCropPointerUp);
+
+    // Riordino feed: gli eventi di trascinamento vengono seguiti a livello di documento.
+    // Su iPhone/Safari questo evita che il gesto si perda quando il dito esce dal riquadro originale.
+    document.addEventListener('touchmove', onGridTouchMove, { passive: false, capture: true });
+    document.addEventListener('touchend', onGridTouchEnd, { passive: false, capture: true });
+    document.addEventListener('touchcancel', onGridTouchEnd, { passive: false, capture: true });
+    document.addEventListener('pointermove', onGridPointerMove, { passive: false, capture: true });
+    document.addEventListener('pointerup', onGridPointerUp, { passive: false, capture: true });
+    document.addEventListener('pointercancel', onGridPointerUp, { passive: false, capture: true });
+    window.addEventListener('blur', cancelGridInteraction);
+
     els.exportButton.addEventListener('click', exportBackup);
     els.importButton.addEventListener('click', () => { closeSheet(); els.backupInput.click(); });
     els.backupInput.addEventListener('change', importBackup);
@@ -466,91 +478,162 @@
   }
 
   function setEditMode(enabled) {
+    if (!enabled) {
+      cancelPendingGridPress();
+      if (dragInfo) finishGridDrag({ render: false, silent: true }).catch(console.error);
+    }
     editMode = enabled;
     els.editorBar.hidden = !enabled;
     document.body.style.paddingBottom = enabled ? '90px' : '';
     renderFeed();
-    if (enabled) showToast('Tieni premuta una foto e trascinala nella nuova posizione');
+    if (enabled) showToast('Tieni premuta una foto, poi trascinala dove vuoi');
   }
 
   function bindLongPressDrag(item) {
-    let timer = null;
-    let pointerId = null;
-    let startX = 0;
-    let startY = 0;
-    let lastX = 0;
-    let lastY = 0;
-    let pressing = false;
-
-    const clearTimer = () => {
-      if (timer) clearTimeout(timer);
-      timer = null;
-    };
-
-    const releasePointer = event => {
-      clearTimer();
-      pressing = false;
-      if (pointerId !== null) {
-        try { item.releasePointerCapture?.(pointerId); } catch (_) {}
-      }
-      pointerId = null;
-      if (dragInfo && (!event || dragInfo.pointerId === event.pointerId)) finishGridDrag();
-    };
-
     item.addEventListener('contextmenu', event => event.preventDefault());
+    item.addEventListener('dragstart', event => event.preventDefault());
 
+    // Percorso iPhone/iPad: usiamo Touch Events in modo esplicito.
+    // Il touch resta seguito dal document fino a quando il dito viene rilasciato.
+    item.addEventListener('touchstart', event => {
+      if (!editMode || dragInfo || gridPress || event.touches.length !== 1) return;
+      if (event.target.closest('.delete-post')) return;
+      const touch = event.changedTouches[0];
+      if (!touch) return;
+      beginGridPress(item, 'touch', touch.identifier, touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    // Mouse/trackpad e dispositivi non-touch: stesso comportamento, senza affidarsi
+    // al drag&drop HTML5 (che su Safari mobile è molto meno prevedibile).
     item.addEventListener('pointerdown', event => {
-      if (event.target.closest('.delete-post') || event.isPrimary === false || dragInfo) return;
+      if (event.pointerType === 'touch') return;
+      if (!editMode || dragInfo || gridPress || event.isPrimary === false || event.button !== 0) return;
+      if (event.target.closest('.delete-post')) return;
       event.preventDefault();
-      pointerId = event.pointerId;
-      pressing = true;
-      startX = lastX = event.clientX;
-      startY = lastY = event.clientY;
-      try { item.setPointerCapture?.(event.pointerId); } catch (_) {}
-
-      timer = setTimeout(() => {
-        timer = null;
-        if (!pressing || pointerId !== event.pointerId || dragInfo) return;
-        startGridDrag(item, {
-          pointerId,
-          clientX: lastX,
-          clientY: lastY
-        });
-      }, 230);
+      beginGridPress(item, 'pointer', event.pointerId, event.clientX, event.clientY);
     }, { passive: false });
+  }
 
-    item.addEventListener('pointermove', event => {
-      if (pointerId !== event.pointerId && dragInfo?.pointerId !== event.pointerId) return;
-      lastX = event.clientX;
-      lastY = event.clientY;
+  function beginGridPress(item, kind, inputId, x, y) {
+    cancelPendingGridPress();
+    const press = {
+      item,
+      kind,
+      inputId,
+      startX: x,
+      startY: y,
+      lastX: x,
+      lastY: y,
+      timer: null
+    };
+    gridPress = press;
+    press.timer = setTimeout(() => {
+      if (gridPress !== press || dragInfo || !editMode) return;
+      gridPress = null;
+      startGridDrag(item, {
+        kind,
+        inputId,
+        clientX: press.lastX,
+        clientY: press.lastY
+      });
+    }, 180);
+  }
 
-      if (dragInfo?.pointerId === event.pointerId) {
-        event.preventDefault();
-        updateGridDrag(event.clientX, event.clientY);
-        return;
-      }
+  function cancelPendingGridPress() {
+    if (!gridPress) return;
+    if (gridPress.timer) clearTimeout(gridPress.timer);
+    gridPress = null;
+  }
 
-      // Un piccolo movimento del dito durante la pressione è normale su iPhone.
-      // Annulliamo il long-press solo se il gesto parte chiaramente prima dell'attivazione.
-      if (Math.hypot(event.clientX - startX, event.clientY - startY) > 24) {
-        clearTimer();
-      }
-    }, { passive: false });
+  function findTouch(list, identifier) {
+    for (const touch of Array.from(list || [])) {
+      if (touch.identifier === identifier) return touch;
+    }
+    return null;
+  }
 
-    item.addEventListener('pointerup', releasePointer);
-    item.addEventListener('pointercancel', releasePointer);
-    item.addEventListener('lostpointercapture', event => {
-      if (dragInfo?.pointerId === event.pointerId) finishGridDrag();
-    });
+  function onGridTouchMove(event) {
+    if (dragInfo?.kind === 'touch') {
+      const touch = findTouch(event.touches, dragInfo.inputId);
+      if (!touch) return;
+      // Da quando la foto è "sollevata", Safari non deve trasformare il gesto in scroll.
+      event.preventDefault();
+      updateGridDrag(touch.clientX, touch.clientY);
+      return;
+    }
+
+    if (gridPress?.kind !== 'touch') return;
+    const touch = findTouch(event.touches, gridPress.inputId);
+    if (!touch) return;
+    gridPress.lastX = touch.clientX;
+    gridPress.lastY = touch.clientY;
+
+    // Se l'utente vuole solo scorrere il feed, il movimento prima del long-press
+    // annulla l'attivazione del drag e lascia Safari libero di scorrere.
+    if (Math.hypot(touch.clientX - gridPress.startX, touch.clientY - gridPress.startY) > 18) {
+      cancelPendingGridPress();
+    }
+  }
+
+  function onGridTouchEnd(event) {
+    if (dragInfo?.kind === 'touch') {
+      const touch = findTouch(event.changedTouches, dragInfo.inputId);
+      if (!touch) return;
+      event.preventDefault();
+      finishGridDrag().catch(console.error);
+      return;
+    }
+
+    if (gridPress?.kind === 'touch' && findTouch(event.changedTouches, gridPress.inputId)) {
+      cancelPendingGridPress();
+    }
+  }
+
+  function onGridPointerMove(event) {
+    if (event.pointerType === 'touch') return;
+    if (dragInfo?.kind === 'pointer' && dragInfo.inputId === event.pointerId) {
+      event.preventDefault();
+      updateGridDrag(event.clientX, event.clientY);
+      return;
+    }
+    if (gridPress?.kind !== 'pointer' || gridPress.inputId !== event.pointerId) return;
+    gridPress.lastX = event.clientX;
+    gridPress.lastY = event.clientY;
+    if (Math.hypot(event.clientX - gridPress.startX, event.clientY - gridPress.startY) > 12) {
+      cancelPendingGridPress();
+    }
+  }
+
+  function onGridPointerUp(event) {
+    if (event.pointerType === 'touch') return;
+    if (dragInfo?.kind === 'pointer' && dragInfo.inputId === event.pointerId) {
+      event.preventDefault();
+      finishGridDrag().catch(console.error);
+      return;
+    }
+    if (gridPress?.kind === 'pointer' && gridPress.inputId === event.pointerId) {
+      cancelPendingGridPress();
+    }
+  }
+
+  function cancelGridInteraction() {
+    cancelPendingGridPress();
+    if (dragInfo) finishGridDrag({ silent: true }).catch(console.error);
   }
 
   function startGridDrag(item, point) {
     const rect = item.getBoundingClientRect();
+    const sourceImage = $('img', item);
+    if (!sourceImage) return;
+
     const ghost = document.createElement('div');
     ghost.className = 'drag-ghost';
     ghost.style.width = `${rect.width}px`;
     ghost.style.height = `${rect.height}px`;
-    ghost.innerHTML = `<img src="${$('img', item).src}" alt="">`;
+    const ghostImage = document.createElement('img');
+    ghostImage.src = sourceImage.currentSrc || sourceImage.src;
+    ghostImage.alt = '';
+    ghost.append(ghostImage);
     document.body.append(ghost);
 
     item.classList.add('drag-source');
@@ -560,18 +643,21 @@
 
     dragInfo = {
       id: item.dataset.id,
-      pointerId: point.pointerId,
+      kind: point.kind,
+      inputId: point.inputId,
       source: item,
       ghost,
       offsetX: Math.max(0, Math.min(rect.width, point.clientX - rect.left)),
       offsetY: Math.max(0, Math.min(rect.height, point.clientY - rect.top)),
       x: point.clientX,
       y: point.clientY,
-      autoScrollFrame: null
+      autoScrollFrame: null,
+      lastTargetIndex: posts.findIndex(post => post.id === item.dataset.id)
     };
 
     setEditorDragState(true);
     positionGhost(point.clientX, point.clientY);
+    reorderGridAtPoint(point.clientX, point.clientY);
     startGridAutoScroll();
   }
 
@@ -584,50 +670,48 @@
   }
 
   function reorderGridAtPoint(x, y) {
-    if (!dragInfo) return;
+    if (!dragInfo || !posts.length) return;
 
-    let target = document.elementFromPoint(x, y)?.closest('.feed-item');
-    if (!target || target === dragInfo.source || !els.grid.contains(target)) {
-      target = nearestGridItem(x, y);
-    }
-    if (!target || target === dragInfo.source) return;
+    const gridRect = els.grid.getBoundingClientRect();
+    const reference = $$('.feed-item', els.grid).find(item => item !== dragInfo.source) || dragInfo.source;
+    if (!reference) return;
+    const cellRect = reference.getBoundingClientRect();
+    const columns = 3;
+    const columnWidth = gridRect.width / columns;
+    const rowHeight = Math.max(1, cellRect.height + 1);
 
-    const fromIndex = posts.findIndex(post => post.id === dragInfo.id);
-    const toIndex = posts.findIndex(post => post.id === target.dataset.id);
-    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    // Calcoliamo direttamente la casella sotto il dito. Non facciamo swap con il vicino:
+    // il post può saltare in un solo gesto dalla prima all'ultima riga (e viceversa).
+    let column = Math.floor((x - gridRect.left) / Math.max(1, columnWidth));
+    let row = Math.floor((y - gridRect.top) / rowHeight);
+    column = Math.max(0, Math.min(columns - 1, column));
+    row = Math.max(0, row);
+    const targetIndex = Math.max(0, Math.min(posts.length - 1, row * columns + column));
 
-    const [moved] = posts.splice(fromIndex, 1);
-    posts.splice(toIndex, 0, moved);
-
-    // Sposta davvero il riquadro nella nuova posizione, non fa uno "swap" singolo.
-    // Continuando a tenere il dito premuto può attraversare tutte le righe del feed.
-    els.grid.insertBefore(dragInfo.source, fromIndex < toIndex ? target.nextSibling : target);
+    moveDraggedPostToIndex(targetIndex);
   }
 
-  function nearestGridItem(x, y) {
-    const gridRect = els.grid.getBoundingClientRect();
-    if (x < gridRect.left - 24 || x > gridRect.right + 24 || y < gridRect.top - 80 || y > gridRect.bottom + 80) return null;
+  function moveDraggedPostToIndex(targetIndex) {
+    if (!dragInfo) return;
+    const fromIndex = posts.findIndex(post => post.id === dragInfo.id);
+    if (fromIndex < 0 || targetIndex < 0 || targetIndex >= posts.length || fromIndex === targetIndex) return;
 
-    let best = null;
-    let bestDistance = Infinity;
-    $$('.feed-item', els.grid).forEach(item => {
-      if (item === dragInfo?.source) return;
-      const rect = item.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const distance = Math.hypot(x - cx, y - cy);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = item;
-      }
-    });
-    return best;
+    const [moved] = posts.splice(fromIndex, 1);
+    posts.splice(targetIndex, 0, moved);
+    dragInfo.lastTargetIndex = targetIndex;
+
+    // Il riquadro originale resta invisibile nella griglia e funziona da "buco"/segnaposto;
+    // il clone visibile rimane invece sotto il dito fino al rilascio.
+    const otherItems = $$('.feed-item', els.grid).filter(item => item !== dragInfo.source);
+    if (targetIndex >= otherItems.length) els.grid.append(dragInfo.source);
+    else els.grid.insertBefore(dragInfo.source, otherItems[targetIndex]);
   }
 
   function positionGhost(x, y) {
     if (!dragInfo) return;
-    dragInfo.ghost.style.left = `${x - dragInfo.offsetX}px`;
-    dragInfo.ghost.style.top = `${y - dragInfo.offsetY}px`;
+    const left = x - dragInfo.offsetX;
+    const top = y - dragInfo.offsetY;
+    dragInfo.ghost.style.transform = `translate3d(${left}px, ${top}px, 0) scale(1.055)`;
   }
 
   function startGridAutoScroll() {
@@ -637,13 +721,13 @@
       if (!dragInfo) return;
 
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
-      const edge = Math.min(96, Math.max(68, viewportHeight * 0.14));
+      const edge = Math.min(110, Math.max(76, viewportHeight * 0.15));
       let delta = 0;
 
       if (dragInfo.y < edge) {
-        delta = -Math.max(4, Math.round((edge - dragInfo.y) / edge * 16));
+        delta = -Math.max(4, Math.round((edge - dragInfo.y) / edge * 18));
       } else if (dragInfo.y > viewportHeight - edge) {
-        delta = Math.max(4, Math.round((dragInfo.y - (viewportHeight - edge)) / edge * 16));
+        delta = Math.max(4, Math.round((dragInfo.y - (viewportHeight - edge)) / edge * 18));
       }
 
       if (delta) {
@@ -662,25 +746,26 @@
     els.editorBar.classList.toggle('drag-active', active);
     const hint = $('.editor-drag-hint', els.editorBar);
     if (hint) hint.textContent = active
-      ? 'Sposta dove vuoi · rilascia per salvare'
-      : 'Tieni premuto · trascina ovunque · rilascia';
+      ? 'Foto sollevata · spostala dove vuoi · poi rilascia'
+      : 'Tieni premuto · solleva · trascina · rilascia';
   }
 
-  async function finishGridDrag() {
+  async function finishGridDrag(options = {}) {
     if (!dragInfo) return;
     const finished = dragInfo;
+    dragInfo = null;
+    cancelPendingGridPress();
     if (finished.autoScrollFrame) cancelAnimationFrame(finished.autoScrollFrame);
     finished.source.classList.remove('drag-source');
     finished.source.removeAttribute('aria-grabbed');
     finished.ghost.remove();
     els.grid.classList.remove('dragging');
     document.body.classList.remove('grid-dragging');
-    dragInfo = null;
     setEditorDragState(false);
 
     await persistOrder();
-    renderFeed();
-    showToast('Nuovo ordine salvato');
+    if (options.render !== false) renderFeed();
+    if (!options.silent) showToast('Nuovo ordine salvato');
   }
 
   async function persistOrder() {
@@ -1272,7 +1357,7 @@
 
   function registerServiceWorker() {
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-      navigator.serviceWorker.register('./sw.js?v=5', { updateViaCache: 'none' })
+      navigator.serviceWorker.register('./sw.js?v=7', { updateViaCache: 'none' })
         .then(registration => registration.update().catch(() => {}))
         .catch(error => console.warn('Service worker:', error));
     }

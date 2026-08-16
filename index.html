@@ -11,7 +11,7 @@
   <title>Rebecca • Anteprima feed</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/icon-180.png">
-  <link rel="stylesheet" href="./styles.css?v=6">
+  <link rel="stylesheet" href="./styles.css?v=7">
 </head>
 <body>
   <div id="app" class="app-shell">
@@ -109,13 +109,13 @@
   <section id="plannerSheet" class="bottom-sheet" aria-modal="true" role="dialog" aria-label="Strumenti anteprima" hidden>
     <div class="sheet-handle"></div>
     <h2>Anteprima feed</h2>
-    <div class="version-badge">Versione 6 · riordino iPhone</div>
+    <div class="version-badge">Versione 7 · trascinamento libero iPhone</div>
     <div id="storageStatus" class="storage-status">Controllo memoria…</div>
     <button class="sheet-action primary" id="addPostButton">
       <span class="sheet-icon">＋</span><span><strong>Aggiungi un post</strong><small>Scegli una o più foto</small></span>
     </button>
     <button class="sheet-action" id="editFeedButton">
-      <span class="sheet-icon">↕</span><span><strong>Riordina o elimina</strong><small>Tieni premuto un post e trascinalo</small></span>
+      <span class="sheet-icon">↕</span><span><strong>Riordina o elimina</strong><small>Tieni premuto, solleva e trascina ovunque</small></span>
     </button>
     <button class="sheet-action" id="exportButton">
       <span class="sheet-icon">⇩</span><span><strong>Esporta backup</strong><small>Salva foto e ordine in un file</small></span>
@@ -130,7 +130,7 @@
   </section>
 
   <section id="editorBar" class="editor-bar" hidden aria-label="Modalità riordino">
-    <span><strong>Modifica feed</strong><small class="editor-drag-hint">Tieni premuto · trascina ovunque · rilascia</small></span>
+    <span><strong>Modifica feed</strong><small class="editor-drag-hint">Tieni premuto · solleva · trascina · rilascia</small></span>
     <button id="finishEditButton">Fine</button>
   </section>
 
@@ -177,7 +177,7 @@
   <input id="photoInput" type="file" accept="image/*" multiple hidden>
   <input id="backupInput" type="file" accept="application/json,.json" hidden>
 
-  <script src="./initial-posts.js?v=6" defer></script>
-  <script src="./app.js?v=6" defer></script>
+  <script src="./initial-posts.js?v=7" defer></script>
+  <script src="./app.js?v=7" defer></script>
 </body>
 </html>

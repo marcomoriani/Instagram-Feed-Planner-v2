@@ -1,10 +1,10 @@
-const CACHE = 'rebecca-feed-planner-v6';
+const CACHE = 'rebecca-feed-planner-v7';
 const CORE = [
   './',
   './index.html',
-  './styles.css?v=6',
-  './initial-posts.js?v=6',
-  './app.js?v=6',
+  './styles.css?v=7',
+  './initial-posts.js?v=7',
+  './app.js?v=7',
   './manifest.webmanifest',
   './assets/profile.jpg',
   './assets/icon-180.png',

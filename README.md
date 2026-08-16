@@ -1,8 +1,8 @@
-# Rebecca • Instagram Feed Planner v6
+# Rebecca • Instagram Feed Planner v7
 
-Versione v5 invariata nelle funzioni di foto, memoria, backup e caroselli. La v6 modifica in modo mirato il solo riordino su iPhone/Safari.
+Versione v5 invariata nelle funzioni di foto, memoria, backup e caroselli. La v7 modifica in modo mirato il solo riordino su iPhone/Safari.
 
-## Correzione v6: riordino libero
+## Correzione v7: riordino libero
 
 - In modalità **Modifica feed**, tieni premuto un post e continua a tenere il dito sullo schermo.
 - Puoi trascinarlo da una riga a qualsiasi altra riga, non soltanto nella casella vicina.
@@ -53,3 +53,7 @@ Nel menu del planner compare `Versione 5 · iPhone/Safari`: serve per verificare
 Il planner salva sul browser/dispositivo tramite IndexedDB. Questa v5 rende il salvataggio locale più robusto, ma GitHub Pages resta un hosting statico: la cancellazione manuale dei dati di Safari, il ripristino dell'iPhone o la cancellazione dei dati del sito possono eliminare l'archivio locale. Per questo rimane disponibile `Esporta backup`.
 
 Per sincronizzare automaticamente gli stessi post tra dispositivi diversi sarebbe necessario un backend/cloud esterno.
+
+
+## Riordino v7
+Su iPhone il trascinamento usa Touch Events seguiti a livello di documento: tieni premuto un post finché si solleva, trascinalo liberamente anche di più righe e rilascialo nella posizione desiderata. L’ordine viene salvato solo al rilascio.
